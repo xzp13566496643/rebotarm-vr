@@ -30,6 +30,10 @@ class reBotArmController(Node):
         self.declare_parameter("frame_id", "base_link")
         self.declare_parameter("ee_frame_id", "end_link")
         self.declare_parameter("disable_after_safe_home", True)
+        self.declare_parameter("servo_velocity_limit", 1.0)
+        self.declare_parameter("servo_max_step", 0.0)
+        self.declare_parameter("servo_velocity_lookahead", 0.15)
+        self.declare_parameter("servo_max_lookahead_step", 0.05)
 
         hardware_config = self.get_parameter("hardware_config").value or None
         model = str(self.get_parameter("model").value or "")
@@ -37,6 +41,14 @@ class reBotArmController(Node):
         self.arm_namespace = str(self.get_parameter("arm_namespace").value or "rebotarm").strip("/")
         joint_state_rate = float(self.get_parameter("joint_state_rate").value)
         cmd_arbitration = str(self.get_parameter("cmd_arbitration").value or "reject")
+        servo_velocity_limit = float(self.get_parameter("servo_velocity_limit").value)
+        servo_max_step = float(self.get_parameter("servo_max_step").value)
+        servo_velocity_lookahead = float(
+            self.get_parameter("servo_velocity_lookahead").value
+        )
+        servo_max_lookahead_step = float(
+            self.get_parameter("servo_max_lookahead_step").value
+        )
         self.disable_after_safe_home = bool(
             self.get_parameter("disable_after_safe_home").value
         )
@@ -66,6 +78,10 @@ class reBotArmController(Node):
             self.hardware,
             self.arm_namespace,
             cmd_arbitration,
+            servo_velocity_limit,
+            servo_max_step,
+            servo_velocity_lookahead,
+            servo_max_lookahead_step,
         )
 
         self.get_logger().info(

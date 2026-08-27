@@ -5,15 +5,30 @@ from rebotarm_msgs.msg import (
     JointMitCmd,
     JointPosVelCmd,
 )
+from trajectory_msgs.msg import JointTrajectory
 
 
 class MotorPassthrough:
-    def __init__(self, node, hardware, namespace: str, arbitration: str) -> None:
+    def __init__(
+        self,
+        node,
+        hardware,
+        namespace: str,
+        arbitration: str,
+        servo_velocity_limit: float,
+        servo_max_step: float,
+        servo_velocity_lookahead: float,
+        servo_max_lookahead_step: float,
+    ) -> None:
         self._node = node
         self._hardware = hardware
         self._arbitration = arbitration
         qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
         self._subscriptions = []
+        self._servo_velocity_limit = servo_velocity_limit
+        self._servo_max_step = servo_max_step
+        self._servo_velocity_lookahead = servo_velocity_lookahead
+        self._servo_max_lookahead_step = servo_max_lookahead_step
 
         joint_commands = (
             (
@@ -78,6 +93,13 @@ class MotorPassthrough:
                     qos,
                 )
 
+        self._subscribe(
+            JointTrajectory,
+            f"/{namespace}/servo_joint_trajectory",
+            self._servo_trajectory_callback,
+            qos,
+        )
+
     def _subscribe(self, msg_type, topic: str, callback, qos: QoSProfile) -> None:
         self._subscriptions.append(
             self._node.create_subscription(
@@ -124,6 +146,34 @@ class MotorPassthrough:
                 self._node.publish_arm_status()
 
         return _callback
+
+    def _servo_trajectory_callback(self, msg: JointTrajectory) -> None:
+        if not self._can_send_lowlevel("/servo_joint_trajectory", allow_preempt=True):
+            return
+        if not msg.points:
+            self._node.get_logger().warn("rejecting empty Servo trajectory")
+            return
+        point = msg.points[-1]
+        velocities = list(point.velocities)
+        if velocities and len(velocities) != len(msg.joint_names):
+            self._node.get_logger().warn(
+                "rejecting Servo trajectory with mismatched joint velocities"
+            )
+            return
+        try:
+            self._hardware.send_joint_group_pos_vel_cmd(
+                list(msg.joint_names),
+                list(point.positions),
+                velocities,
+                self._servo_velocity_limit,
+                self._servo_max_step,
+                self._servo_velocity_lookahead,
+                self._servo_max_lookahead_step,
+            )
+        except Exception as exc:
+            self._node.get_logger().warn(f"Servo trajectory rejected: {exc}")
+        finally:
+            self._node.publish_arm_status()
 
     def _can_send_lowlevel(self, label: str, *, allow_preempt: bool) -> bool:
         state = self._hardware.state_machine

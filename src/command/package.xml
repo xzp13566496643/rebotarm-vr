@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematyp="application/xml"?>
+<package format="3">
+  <name>rebotarm_command</name>
+  <version>0.1.0</version>
+  <description>Small MoveIt command nodes for the real reBotArm.</description>
+  <maintainer email="xuzhanpeng@example.com">xuzhanpeng</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>geometry_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rebotarm_msgs</depend>
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>trajectory_msgs</depend>
+
+  <exec_depend>moveit_configs_utils</exec_depend>
+  <exec_depend>moveit_servo</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

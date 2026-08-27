@@ -366,6 +366,67 @@ class HardwareManager:
         self._arm_group.send_pos_vel(target_pos, vlim=target_vlim)
         self.set_state_machine("LOWLEVEL_STREAMING")
 
+    @_locked
+    def send_joint_group_pos_vel_cmd(
+        self,
+        joint_names: list[str],
+        positions: list[float],
+        velocities: list[float],
+        velocity_limit: float,
+        max_step: float,
+        velocity_lookahead: float,
+        max_lookahead_step: float,
+    ) -> None:
+        """Atomically stream one complete arm position target from MoveIt Servo."""
+        if list(joint_names) != self.joint_names:
+            raise ValueError(
+                f"joint_names must exactly match {self.joint_names}, got {joint_names}"
+            )
+        target = np.asarray(positions, dtype=np.float64)
+        if target.shape != (len(self.joint_names),) or not np.all(np.isfinite(target)):
+            raise ValueError("positions must contain one finite value per arm joint")
+
+        if velocities:
+            velocity = np.asarray(velocities, dtype=np.float64)
+            if velocity.shape != target.shape or not np.all(np.isfinite(velocity)):
+                raise ValueError("velocities must contain one finite value per arm joint")
+            lead = np.clip(
+                velocity * max(0.0, float(velocity_lookahead)),
+                -max(0.0, float(max_lookahead_step)),
+                max(0.0, float(max_lookahead_step)),
+            )
+            target = target + lead
+            # The DM position-velocity mode takes a positive speed limit per motor.
+            # Keep a small floor to prevent repeated stop/start behavior while
+            # respecting the global real-hardware speed ceiling.
+            vlim = np.clip(
+                np.abs(velocity) * 1.5,
+                0.05,
+                float(velocity_limit),
+            )
+        else:
+            vlim = np.full(
+                len(self.joint_names), float(velocity_limit), dtype=np.float64
+            )
+
+        self._begin_lowlevel_streaming("pos_vel")
+        # Feedback is only required by the optional per-command step guard.
+        # Reading all motors here on every Servo callback adds a CAN round trip
+        # before every command and makes real-hardware teleoperation laggy.
+        if float(max_step) > 0.0:
+            current = np.asarray(
+                self._arm_group.get_positions(request_feedback=True), dtype=np.float64
+            )
+            largest_step = float(np.max(np.abs(target - current)))
+            if largest_step > float(max_step):
+                raise ValueError(
+                    f"servo target step {largest_step:.6f} rad exceeds "
+                    f"{max_step:.6f} rad"
+                )
+
+        self._arm_group.send_pos_vel(target, vlim=vlim)
+        self.set_state_machine("LOWLEVEL_STREAMING")
+
     def current_pose(self):
         q, _, _ = self.get_joint_state()
         q_padded = self._pad_q_for_model(self._gc_model, q, len(self.joint_names))

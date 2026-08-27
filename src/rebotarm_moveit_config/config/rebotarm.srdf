@@ -38,6 +38,14 @@
   <disable_collisions link1="link3" link2="link4" reason="Adjacent"/>
   <disable_collisions link1="link4" link2="link5" reason="Adjacent"/>
   <disable_collisions link1="link5" link2="link6" reason="Adjacent"/>
+  <disable_collisions
+  link1="link5"
+  link2="gripper_link"
+  reason="Adjacent"/>
+  <disable_collisions
+  link1="link4"
+  link2="gripper_link"
+  reason="Never"/>
   <disable_collisions link1="link6" link2="gripper_link" reason="Adjacent"/>
   <disable_collisions link1="gripper_link" link2="gripper_left" reason="Adjacent"/>
   <disable_collisions link1="gripper_link" link2="gripper_right" reason="Adjacent"/>

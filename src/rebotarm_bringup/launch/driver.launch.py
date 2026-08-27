@@ -47,6 +47,10 @@ def generate_launch_description():
                             disable_after_safe_home,
                             value_type=bool,
                         ),
+                        "servo_velocity_limit": 1.0,
+                        "servo_max_step": 0.0,
+                        "servo_velocity_lookahead": 0.15,
+                        "servo_max_lookahead_step": 0.05,
                     }
                 ],
             ),
