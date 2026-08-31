@@ -61,6 +61,9 @@ public:
 private:
   static double clamp(double value, double limit)
   {
+    if (limit <= 0.0) {
+      return value;
+    }
     return std::clamp(value, -limit, limit);
   }
 

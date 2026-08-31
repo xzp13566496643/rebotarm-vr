@@ -9,9 +9,7 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
     moveit_config = (
-        MoveItConfigsBuilder(
-            "rebotarm", package_name="rebotarm_moveit_config"
-        )
+        MoveItConfigsBuilder("rebotarm", package_name="rebotarm_moveit_config")
         .robot_description(file_path="config/rebotarm.urdf.xacro")
         .robot_description_semantic(file_path="config/rebotarm.srdf")
         .robot_description_kinematics(file_path="config/kinematics.yaml")
@@ -21,10 +19,7 @@ def generate_launch_description():
     )
 
     config_path = os.path.join(
-        get_package_share_directory("rebotarm_command"),
-        "config",
-        "servo_sim.yaml",
-    )
+        get_package_share_directory("rebotarm_command"), "config", "servo_sim.yaml")
     with open(config_path, "r", encoding="utf-8") as stream:
         servo_params = {"moveit_servo": yaml.safe_load(stream)}
 
@@ -40,22 +35,29 @@ def generate_launch_description():
             moveit_config.robot_description_kinematics,
         ],
     )
-
     mapping = Node(
         package="rebotarm_command",
-        executable="vr_to_servo",
-        name="vr_to_servo",
+        executable="vr_pose_target_servo.py",
+        name="vr_pose_target_servo",
         output="screen",
-        parameters=[
-            {
-                # A non-positive limit disables clipping in vr_to_servo.
-                # Keep the real-hardware launch limits unchanged.
-                # Match MoveIt Servo's documented default Cartesian speed scales.
-                # The bridge must enforce these because command_in_type is speed_units.
-                "max_linear_speed": 0.40,
-                "max_angular_speed": 0.80,
-            }
-        ],
+        parameters=[{
+            "position_scale": 0.8,
+            "orientation_scale": 1.0,
+            "position_gain": 3.0,
+            "orientation_gain": 3.0,
+            "max_linear_speed": 0.4,
+            "max_angular_speed": 0.8,
+        }],
     )
-
-    return LaunchDescription([servo, mapping])
+    table_collision = Node(
+        package="rebotarm_command",
+        executable="table_collision.py",
+        name="table_collision",
+        output="screen",
+        parameters=[{
+            "frame_id": "base_link",
+            "surface_z": 0.0,
+            "base_cutout_size": 0.40,
+        }],
+    )
+    return LaunchDescription([servo, mapping, table_collision])

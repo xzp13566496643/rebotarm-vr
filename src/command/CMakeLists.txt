@@ -35,6 +35,12 @@ ament_target_dependencies(
 
 install(TARGETS vr_to_servo DESTINATION lib/${PROJECT_NAME})
 
+install(PROGRAMS
+  scripts/table_collision.py
+  scripts/vr_pose_target_servo.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 add_executable(nearest_self_distance src/nearest_self_distance.cpp)
 ament_target_dependencies(
   nearest_self_distance
