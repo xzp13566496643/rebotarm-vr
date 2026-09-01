@@ -48,7 +48,9 @@ def generate_launch_description():
             "max_linear_speed": 0.10,
             "max_angular_speed": 0.60,
             "hardware_gripper": True,
-            "gripper_motor_vlim": 2.0,
+            "gripper_motor_speed": 2.0,
+            "gripper_mit_kp": 1.0,
+            "gripper_mit_kd": 1.0,
         }],
     )
     table_collision = Node(

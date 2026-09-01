@@ -6,7 +6,7 @@ from geometry_msgs.msg import PoseStamped, TwistStamped
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
-from rebotarm_msgs.msg import JointPosVelCmd
+from rebotarm_msgs.msg import JointMitCmd, JointMotorState
 from std_msgs.msg import Float32
 from tf2_ros import Buffer, TransformException, TransformListener
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -59,7 +59,9 @@ class VrPoseTargetServo(Node):
         self.hardware_gripper = self.declare_parameter("hardware_gripper", False).value
         self.gripper_motor_open = self.declare_parameter("gripper_motor_open", -5.0).value
         self.gripper_motor_closed = self.declare_parameter("gripper_motor_closed", 0.0).value
-        self.gripper_motor_vlim = self.declare_parameter("gripper_motor_vlim", 2.0).value
+        self.gripper_motor_speed = self.declare_parameter("gripper_motor_speed", 2.0).value
+        self.gripper_mit_kp = self.declare_parameter("gripper_mit_kp", 1.0).value
+        self.gripper_mit_kd = self.declare_parameter("gripper_mit_kd", 1.0).value
 
         self.tf_buffer = Buffer(cache_time=Duration(seconds=5.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -67,10 +69,12 @@ class VrPoseTargetServo(Node):
         self.gripper_pub = self.create_publisher(
             JointTrajectory, "/gripper_controller/joint_trajectory", 10)
         self.hardware_gripper_pub = self.create_publisher(
-            JointPosVelCmd, "/rebotarm/gripper/cmd/pos_vel", 10)
+            JointMitCmd, "/rebotarm/gripper/cmd/mit", 10)
         self.create_subscription(PoseStamped, "/pico_right_controller/pose", self.pose_cb, 10)
         self.create_subscription(Float32, "/pico_left_controller/trigger", self.clutch_cb, 10)
         self.create_subscription(Float32, "/pico_right_controller/trigger", self.gripper_cb, 10)
+        self.create_subscription(
+            JointMotorState, "/rebotarm/gripper/state", self.gripper_state_cb, 10)
 
         self.hand_pose = None
         self.last_hand_time = None
@@ -79,6 +83,9 @@ class VrPoseTargetServo(Node):
         self.robot_start = None
         self.target = None
         self.last_gripper = None
+        self.gripper_feedback = None
+        self.gripper_target = None
+        self.gripper_command = None
         self.create_timer(0.02, self.control_loop)
         self.get_logger().info(
             "VR cumulative pose target ready: hold left trigger; right pose sets a persistent TCP target")
@@ -122,13 +129,8 @@ class VrPoseTargetServo(Node):
                 target = self.gripper_motor_open
             else:
                 return
-            if self.last_gripper is not None and abs(target - self.last_gripper) < 0.02:
-                return
-            cmd = JointPosVelCmd()
-            cmd.pos = target
-            cmd.vlim = self.gripper_motor_vlim
-            self.hardware_gripper_pub.publish(cmd)
-            self.last_gripper = target
+            self.gripper_target = max(
+                min(target, self.gripper_motor_closed), self.gripper_motor_open)
             return
 
         target = 0.045 * (1.0 - trigger)
@@ -142,6 +144,35 @@ class VrPoseTargetServo(Node):
         cmd.points = [point]
         self.gripper_pub.publish(cmd)
         self.last_gripper = target
+
+    def gripper_state_cb(self, msg):
+        self.gripper_feedback = max(
+            min(float(msg.position), self.gripper_motor_closed), self.gripper_motor_open)
+        if self.gripper_command is None:
+            self.gripper_command = self.gripper_feedback
+
+    def update_hardware_gripper(self):
+        if not self.hardware_gripper or self.gripper_target is None:
+            return
+        if self.gripper_command is None:
+            # Never issue a blind absolute MIT target before feedback arrives.
+            return
+        max_step = max(0.0, float(self.gripper_motor_speed)) * 0.02
+        error = self.gripper_target - self.gripper_command
+        if abs(error) <= 1e-4:
+            return
+        step = max(-max_step, min(error, max_step))
+        self.gripper_command = max(
+            min(self.gripper_command + step, self.gripper_motor_closed),
+            self.gripper_motor_open)
+        cmd = JointMitCmd()
+        cmd.pos = self.gripper_command
+        cmd.vel = 0.0
+        cmd.kp = float(self.gripper_mit_kp)
+        cmd.kd = float(self.gripper_mit_kd)
+        cmd.tau = 0.0
+        cmd.stamp = self.get_clock().now().to_msg()
+        self.hardware_gripper_pub.publish(cmd)
 
     def lookup_tcp(self):
         try:
@@ -176,6 +207,7 @@ class VrPoseTargetServo(Node):
         )
 
     def control_loop(self):
+        self.update_hardware_gripper()
         if not self.engaged or self.target is None or self.last_hand_time is None:
             self.publish_zero()
             return

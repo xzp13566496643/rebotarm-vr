@@ -36,6 +36,7 @@ ament_target_dependencies(
 install(TARGETS vr_to_servo DESTINATION lib/${PROJECT_NAME})
 
 install(PROGRAMS
+  scripts/arm_only_safe_return.py
   scripts/table_collision.py
   scripts/vr_pose_target_servo.py
   DESTINATION lib/${PROJECT_NAME}
