@@ -24,6 +24,8 @@ models:
         position_limits:
           open: -5.0
           close: 0.0
+        mit_kp: 1.0
+        mit_kd: 1.0
       control:
         arm_control_mode: posvel
         mit_kp: [120.0, 120.0, 120.0, 18.0, 18.0, 18.0]

@@ -119,11 +119,32 @@ def _load_ros_hardware_config(
         merged = yaml.safe_load(f) or {}
 
     merged = _deep_merge(merged, model_config.get("overrides", {}) or {})
+    _apply_gripper_motor_overrides(merged)
     if channel:
         merged["channel"] = channel
     _add_runtime_config(merged)
 
     return model_name, merged
+
+
+def _apply_gripper_motor_overrides(data: dict[str, Any]) -> None:
+    """Apply ROS-owned gripper MIT gains to the SDK motor configuration."""
+    gripper = data.get("gripper", {}) or {}
+    if "mit_kp" not in gripper and "mit_kd" not in gripper:
+        return
+
+    gripper_joints = set(
+        str(name)
+        for name in data.get("groups", {}).get("gripper", {}).get("joints", [])
+    )
+    for joint in data.get("joints", []):
+        if str(joint.get("name", "")) not in gripper_joints:
+            continue
+        mit = joint.setdefault("MIT", {})
+        if "mit_kp" in gripper:
+            mit["kp"] = float(gripper["mit_kp"])
+        if "mit_kd" in gripper:
+            mit["kd"] = float(gripper["mit_kd"])
 
 
 def _add_runtime_config(data: dict[str, Any]) -> None:
