@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+*.apk
 info
 third_party/
 vr_ws/
