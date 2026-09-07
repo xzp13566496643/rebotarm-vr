@@ -15,6 +15,7 @@ from .ros_services import ArmServices
 
 class reBotArmController(Node):
     def __init__(self) -> None:
+        """创建真机 ROS2 驱动节点，连接硬件并注册反馈、服务、动作和低层命令接口。"""
         super().__init__("reBotArmController")
 
         self.reentrant_group = ReentrantCallbackGroup()
@@ -90,15 +91,18 @@ class reBotArmController(Node):
         )
 
     def publish_arm_status(self, *, read_hardware: bool = True) -> None:
+        """立即发布一次驱动状态；可选择是否同时读取各电机状态码。"""
         self.joint_state_publisher.publish_status(read_hardware=read_hardware)
 
     def shutdown(self) -> None:
+        """执行驱动关闭流程：安全回位，并按参数决定是否失能电机。"""
         self.hardware.shutdown(
             disable_after_safe_home=self.disable_after_safe_home,
         )
 
 
 def main(args=None) -> None:
+    """运行多线程 ROS2 驱动；退出时保证调用硬件关闭流程。"""
     rclpy.init(args=args)
     node = reBotArmController()
     executor = MultiThreadedExecutor(num_threads=4)

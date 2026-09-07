@@ -7,6 +7,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    """生成真机驱动启动描述：解析型号、串口和频率并启动 reBotArmController。"""
     bringup_share = FindPackageShare("rebotarm_bringup")
     hardware_config = LaunchConfiguration("hardware_config")
     model = LaunchConfiguration("model")

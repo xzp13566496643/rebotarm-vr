@@ -14,6 +14,7 @@ _GRIPPER_CLOSED_POSITION = 0.0
 
 
 def _locked(method):
+    """为硬件操作加互斥锁，避免多个 ROS 回调同时切模式或发送命令。"""
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
         with self._cmd_lock:
@@ -31,6 +32,7 @@ class HardwareManager:
         model: str = "",
         channel: str = "",
     ) -> None:
+        """解析硬件配置并创建 SDK 机械臂对象、控制器和运行状态。"""
         self._cmd_lock = threading.RLock()
         hardware_config_path, hardware_data = resolve_hardware_config(
             hardware_config,
@@ -152,6 +154,7 @@ class HardwareManager:
 
     @_locked
     def connect(self) -> None:
+        """连接 USB2CAN、注册电机、配置初始模式并启动当前位置保持。"""
         if self._connected:
             return
         try:
@@ -173,6 +176,7 @@ class HardwareManager:
             raise
 
     def shutdown(self, disable_after_safe_home: bool = True) -> None:
+        """安全回位、停止控制、按配置失能电机并断开底层总线。"""
         if not self._connected:
             return
         try:
@@ -192,6 +196,7 @@ class HardwareManager:
             self.set_state_machine("IDLE")
 
     def get_joint_state(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """读取机械臂六关节的位置、速度和力矩反馈。"""
         return self._get_arm_state()
 
     def _get_arm_state(
@@ -246,10 +251,12 @@ class HardwareManager:
         self.set_state_machine("IDLE")
 
     def enable(self) -> None:
+        """启动末端位置保持控制并使机械臂恢复受控使能状态。"""
         self.start_endpos_control()
 
     @_locked
     def disable(self) -> None:
+        """停止控制输出并通过 SDK 失能所有已注册电机。"""
         if self._gravity_comp_active:
             raise RuntimeError("stop gravity compensation before disable")
         self._control_output_enabled = False
@@ -261,6 +268,7 @@ class HardwareManager:
         self.set_state_machine("IDLE")
 
     def safe_home(self) -> None:
+        """从当前姿态执行安全回零，完成后继续保持而不直接失能。"""
         with self._cmd_lock:
             self.stop_motion()
             self.set_state_machine("IDLE")
@@ -377,7 +385,7 @@ class HardwareManager:
         velocity_lookahead: float,
         max_lookahead_step: float,
     ) -> None:
-        """Atomically stream one complete arm position target from MoveIt Servo."""
+        """原子接收 MoveIt Servo 的完整六关节目标并以 POS_VEL 下发。"""
         if list(joint_names) != self.joint_names:
             raise ValueError(
                 f"joint_names must exactly match {self.joint_names}, got {joint_names}"
@@ -466,6 +474,7 @@ class HardwareManager:
         return bool(ok), [float(v) for v in self._endpos_ctrl._q_target]
 
     def get_joint_status_codes(self) -> list[int]:
+        """从 motorbridge 状态缓存读取机械臂六个电机的状态码。"""
         codes: list[int] = []
         for name in self.joint_names:
             try:
@@ -619,6 +628,7 @@ class HardwareManager:
         return reached, self.get_gripper_state()[0]
 
     def get_gripper_state(self) -> tuple[float, float, float, int]:
+        """读取夹爪物理电机的位置、速度、力矩和状态码。"""
         if not self.has_gripper or not self._gripper_name:
             return 0.0, 0.0, 0.0, 0
         pos = float(self._gripper_group.get_positions()[0])
@@ -651,10 +661,9 @@ class HardwareManager:
     ) -> None:
         self._begin_gripper_command()
         self._begin_gripper_lowlevel("mit")
-        # When the web sends kp=0 or kd=0, pass None so the JointGroup
-        # falls back to its configured MIT gains (from the SDK config).
-        gripper_kp = np.array([float(kp)], dtype=np.float64) if kp != 0 else None
-        gripper_kd = np.array([float(kd)], dtype=np.float64) if kd != 0 else None
+        # MIT消息中的0是有效控制值。尤其恒力闭合必须使用kp=0，不能回退到默认刚度。
+        gripper_kp = np.array([float(kp)], dtype=np.float64)
+        gripper_kd = np.array([float(kd)], dtype=np.float64)
         self._gripper_group.send_mit(
             np.array([float(pos)], dtype=np.float64),
             vel=np.array([float(vel)], dtype=np.float64),
@@ -666,8 +675,12 @@ class HardwareManager:
 
     @_locked
     def send_gripper_pos_vel_cmd(self, pos: float, vlim: float) -> None:
+        """接收夹爪目标角度和速度上限，切换为 POS_VEL 后下发给夹爪组。"""
+        # 检查驱动状态，并在需要时停止与低层命令冲突的旧控制循环。
         self._begin_gripper_command()
+        # 确保夹爪电机处于 POS_VEL；当前实现每条新命令都会执行该调用。
         self._begin_gripper_lowlevel("pos_vel")
+        # 数组长度为 1，因为 gripper 组只有一个物理电机。
         self._gripper_group.send_pos_vel(
             np.array([float(pos)], dtype=np.float64),
             vlim=np.array([float(vlim)], dtype=np.float64),
@@ -675,6 +688,7 @@ class HardwareManager:
         self._gripper_target_position = None
 
     def _begin_gripper_command(self, *, allow_endpos: bool = False) -> None:
+        """检查夹爪命令是否允许执行，并处理与整机位置控制循环的冲突。"""
         if not self._enabled:
             raise RuntimeError("rejecting gripper command while arm is disabled")
         if self._gravity_comp_active or self.state_machine == "GRAVITY_COMP":
@@ -689,6 +703,7 @@ class HardwareManager:
         if not self.has_gripper or not self._gripper_name:
             raise RuntimeError("gripper is not initialized")
         if not allow_endpos and self.control_loop_active:
+            # 注意：这里停止的是 RebotArm 共用控制循环，不只是夹爪控制。
             self.stop_motion()
             self._robot.stop_control_loop()
             self._endpos_ctrl._running = False
@@ -698,6 +713,7 @@ class HardwareManager:
     # ------------------------------------------------------------------
 
     def _begin_lowlevel_streaming(self, required_mode: str) -> None:
+        """进入机械臂低层流式控制，并保证六关节采用指定电机模式。"""
         if not self._enabled:
             raise RuntimeError("rejecting low-level command while arm is disabled")
         if self._gravity_comp_active or self.state_machine == "GRAVITY_COMP":
@@ -720,11 +736,15 @@ class HardwareManager:
         self.set_state_machine("LOWLEVEL_STREAMING")
 
     def _begin_gripper_lowlevel(self, required_mode: str) -> None:
-        self._enter_mode(self._gripper_group, required_mode, "gripper")
+        """让夹爪组进入指定低层模式，并把驱动状态标记为低层流式控制。"""
+        # 只有模式确实不同时才写参数并执行ensure_mode，避免每次开合重复配置。
+        if required_mode != self._gripper_group.mode:
+            self._enter_mode(self._gripper_group, required_mode, "gripper")
         self.set_state_machine("LOWLEVEL_STREAMING")
 
     @staticmethod
     def _enter_mode(group, required_mode: str, label: str, **mit_gains) -> None:
+        """统一调用电机组的模式切换函数；切换失败时向 ROS 回调抛出异常。"""
         if required_mode == "mit":
             ok = group.mode_mit(**mit_gains)
         elif required_mode == "pos_vel":
@@ -740,6 +760,7 @@ class HardwareManager:
         self._start_endpos_loop(target)
 
     def _start_endpos_loop(self, target: np.ndarray | None = None) -> None:
+        """配置电机组、设置关节保持目标并启动 SDK 周期线程。"""
         self._configure_groups_for_endpos()
         if target is None:
             self.hold_current_position()
@@ -751,6 +772,7 @@ class HardwareManager:
         self._endpos_ctrl._running = True
 
     def _configure_groups_for_endpos(self) -> None:
+        """设置机械臂模式并使能，同时把真机夹爪初始化为 MIT。"""
         if self._arm_control_mode == "mit":
             self._arm_group.mode_mit(
                 kp=self._arm_mit_kp,
@@ -776,6 +798,7 @@ class HardwareManager:
         return bool(self._endpos_ctrl._moving)
 
     def _endpos_loop_cb(self, robot, dt: float) -> None:
+        """SDK 周期回调：在互斥锁可用时计算并发送一次关节命令。"""
         del dt
         if not self._cmd_lock.acquire(blocking=False):
             return
@@ -787,6 +810,7 @@ class HardwareManager:
             self._cmd_lock.release()
 
     def _send_endpos_hold_once(self) -> None:
+        """按照当前机械臂模式立即发送一次关节保持目标。"""
         if self._arm_control_mode == "mit":
             self._arm_group.send_mit(
                 self._endpos_ctrl._q_target,

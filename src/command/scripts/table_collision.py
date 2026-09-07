@@ -9,9 +9,10 @@ from shape_msgs.msg import SolidPrimitive
 
 
 class TableCollisionPublisher(Node):
-    """Publish a z=0 tabletop while leaving clearance for the fixed robot base."""
+    """发布 z=0 桌面碰撞体，并在固定底座周围保留方形缺口。"""
 
     def __init__(self) -> None:
+        """创建持久化碰撞物体发布器，并以 1 Hz 重发桌面。"""
         super().__init__("table_collision")
         self.declare_parameter("frame_id", "base_link")
         self.declare_parameter("table_size", 4.0)
@@ -29,6 +30,7 @@ class TableCollisionPublisher(Node):
 
     @staticmethod
     def add_box(msg: CollisionObject, dimensions, xyz) -> None:
+        """向 CollisionObject 追加一个指定尺寸和中心位置的长方体。"""
         primitive = SolidPrimitive()
         primitive.type = SolidPrimitive.BOX
         primitive.dimensions = list(dimensions)
@@ -39,6 +41,7 @@ class TableCollisionPublisher(Node):
         msg.primitive_poses.append(pose)
 
     def publish_table(self) -> None:
+        """用四块长方体组成带底座缺口的桌面，并发布到规划场景。"""
         frame_id = str(self.get_parameter("frame_id").value)
         size = float(self.get_parameter("table_size").value)
         cutout = float(self.get_parameter("base_cutout_size").value)
@@ -78,6 +81,7 @@ class TableCollisionPublisher(Node):
 
 
 def main(args=None) -> None:
+    """运行桌面碰撞体发布节点。"""
     rclpy.init(args=args)
     node = TableCollisionPublisher()
     try:

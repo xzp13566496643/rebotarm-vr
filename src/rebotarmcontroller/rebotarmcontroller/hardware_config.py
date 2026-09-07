@@ -18,6 +18,7 @@ def resolve_hardware_config(
     model: str,
     channel: str,
 ) -> tuple[Path, dict[str, Any]]:
+    """合并 ROS 总配置、型号 SDK 配置和启动参数，生成本次运行配置。"""
     sdk_root = _ensure_rebot_sdk_in_syspath()
     model_name, data = _load_ros_hardware_config(
         sdk_root,
@@ -39,6 +40,7 @@ def _workspace_root() -> Path:
 
 
 def _ensure_rebot_sdk_in_syspath() -> Path:
+    """定位 third_party/reBotArm_control_py 并加入 Python 模块搜索路径。"""
     root = _workspace_root() / "third_party" / "reBotArm_control_py"
     if not (root / "reBotArm_control_py").is_dir():
         raise FileNotFoundError(
@@ -87,6 +89,7 @@ def _load_ros_hardware_config(
     model: str,
     channel: str,
 ) -> tuple[str, dict[str, Any]]:
+    """选择 dm/rs 型号，加载 SDK YAML，再应用 ROS 覆盖项和串口参数。"""
     config_path = (
         Path(hardware_config).expanduser()
         if hardware_config
@@ -148,6 +151,7 @@ def _apply_gripper_motor_overrides(data: dict[str, Any]) -> None:
 
 
 def _add_runtime_config(data: dict[str, Any]) -> None:
+    """把机械臂控制和重力补偿参数整理成 HardwareManager 使用的向量。"""
     arm_joints = _arm_joint_names(data)
     n = len(arm_joints)
     gravity_config = data.get("gravity_compensation", {}) or {}
@@ -258,6 +262,7 @@ _resolved_config_dir: Path | None = None
 
 
 def _write_resolved_hardware_config(model: str, data: dict[str, Any]) -> Path:
+    """把合并后的配置写入临时 YAML，供 SDK RebotArm 读取。"""
     global _resolved_config_dir
     if _resolved_config_dir is None:
         _resolved_config_dir = Path(tempfile.mkdtemp(prefix="rebotarm_ros2_"))

@@ -13,6 +13,7 @@ from .conversions import pose_to_xyz_rpy
 
 class ArmServices:
     def __init__(self, node, hardware, namespace: str) -> None:
+        """注册真机使能、失能、安全回位、校零、IK和夹爪等 ROS2 服务。"""
         self._node = node
         self._hardware = hardware
 
@@ -47,6 +48,7 @@ class ArmServices:
             )
 
     def _run(self, response, action, success_message: str, *, read_hardware=True):
+        """统一执行服务对应的硬件操作，捕获异常并刷新整机状态。"""
         try:
             action()
             response.success = True
@@ -58,9 +60,11 @@ class ArmServices:
         return response
 
     def enable(self, _request, response):
+        """处理 /rebotarm/enable：建立保持控制并使能电机。"""
         return self._run(response, self._hardware.enable, "enabled")
 
     def disable(self, _request, response):
+        """处理 /rebotarm/disable：停止重力补偿和运动后失能所有电机。"""
         def action():
             self._hardware.stop_gravity_compensation()
             self._hardware.disable()
@@ -68,6 +72,7 @@ class ArmServices:
         return self._run(response, action, "disabled", read_hardware=False)
 
     def safe_home(self, _request, response):
+        """处理 /rebotarm/safe_home：调用驱动的安全回位流程。"""
         return self._run(response, self._hardware.safe_home, "safe_home complete")
 
     def start_gravity_compensation(self, _request, response):

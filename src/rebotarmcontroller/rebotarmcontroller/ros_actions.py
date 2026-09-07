@@ -12,6 +12,7 @@ from .conversions import pose_to_xyz_rpy
 
 class ArmActions:
     def __init__(self, node, hardware, namespace: str) -> None:
+        """注册末端轨迹、六关节轨迹和夹爪三个 ROS2 Action 服务端。"""
         self._node = node
         self._hardware = hardware
         self._namespace = namespace
@@ -132,6 +133,7 @@ class ArmActions:
         return result
 
     def execute_follow_joint_trajectory(self, goal_handle):
+        """按时间插值六关节目标，以 50 Hz 写入驱动保持控制器。"""
         goal = goal_handle.request
         result = FollowJointTrajectory.Result()
         trajectory = goal.trajectory
@@ -242,6 +244,7 @@ class ArmActions:
         return result
 
     def execute_gripper_command(self, goal_handle):
+        """执行夹爪 Action，并根据位置反馈和力矩判断到达或堵转。"""
         goal = goal_handle.request.command
         result = GripperCommand.Result()
         feedback = GripperCommand.Feedback()

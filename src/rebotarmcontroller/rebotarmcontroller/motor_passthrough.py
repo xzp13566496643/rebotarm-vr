@@ -20,6 +20,7 @@ class MotorPassthrough:
         servo_velocity_lookahead: float,
         servo_max_lookahead_step: float,
     ) -> None:
+        """建立 ROS2 低层电机命令订阅，并把消息转交给 HardwareManager。"""
         self._node = node
         self._hardware = hardware
         self._arbitration = arbitration
@@ -68,6 +69,7 @@ class MotorPassthrough:
             (
                 JointPosVelCmd,
                 "cmd/pos_vel",
+                # 对应 /rebotarm/gripper/cmd/pos_vel：携带目标角度 pos 和速度上限 vlim。
                 lambda hw, msg: hw.send_gripper_pos_vel_cmd(msg.pos, msg.vlim),
             ),
         )
@@ -101,6 +103,7 @@ class MotorPassthrough:
         )
 
     def _subscribe(self, msg_type, topic: str, callback, qos: QoSProfile) -> None:
+        """创建一个可靠 QoS 的 ROS2 订阅并保存对象，防止订阅被垃圾回收。"""
         self._subscriptions.append(
             self._node.create_subscription(
                 msg_type,
@@ -131,7 +134,9 @@ class MotorPassthrough:
         return _callback
 
     def _make_gripper_callback(self, label: str, command) -> object:
+        """生成夹爪话题回调：先做控制仲裁，再调用对应的硬件命令函数。"""
         def _callback(msg) -> None:
+            # 安全回零、重力补偿等状态下拒绝互相冲突的低层夹爪命令。
             if not self._can_send_lowlevel(
                 f"/gripper/{label}",
                 allow_preempt=False,
@@ -139,6 +144,7 @@ class MotorPassthrough:
                 return
 
             try:
+                # POS_VEL 时最终调用 HardwareManager.send_gripper_pos_vel_cmd()。
                 command(self._hardware, msg)
             except Exception as exc:
                 self._node.get_logger().warn(f"gripper {label} failed: {exc}")
@@ -148,6 +154,7 @@ class MotorPassthrough:
         return _callback
 
     def _servo_trajectory_callback(self, msg: JointTrajectory) -> None:
+        """接收 MoveIt Servo 六关节轨迹点并转交真机 POS_VEL 接口。"""
         if not self._can_send_lowlevel("/servo_joint_trajectory", allow_preempt=True):
             return
         if not msg.points:
@@ -176,6 +183,7 @@ class MotorPassthrough:
             self._node.publish_arm_status()
 
     def _can_send_lowlevel(self, label: str, *, allow_preempt: bool) -> bool:
+        """根据驱动状态机仲裁，决定当前低层命令允许、拒绝还是抢占。"""
         state = self._hardware.state_machine
         if state in ("GRAVITY_COMP", "SAFE_HOMING"):
             self._node.get_logger().warn(f"rejecting {label} in state {state}")

@@ -24,6 +24,7 @@ moveit_parameters = SourceFileLoader(
 
 
 def _default_model():
+    """从真机硬件总配置读取默认型号；读取失败时使用 dm。"""
     try:
         path = Path(
             get_package_share_directory("rebotarm_bringup")
@@ -37,6 +38,7 @@ def _default_model():
 
 
 def generate_launch_description():
+    """声明真机 MoveIt、RViz和命名空间启动参数。"""
     rviz_config_arg = DeclareLaunchArgument(
         "rviz_config",
         default_value="moveit.rviz",
@@ -70,6 +72,7 @@ def generate_launch_description():
 
 
 def _launch_setup(context, *args, **kwargs):
+    """装载真机 URDF/SRDF/运动学/限位，并启动 move_group、TF、模型和 RViz。"""
     del args, kwargs
     model = LaunchConfiguration("model").perform(context).strip().lower()
     is_rs = model == "rs"

@@ -12,6 +12,7 @@ def _gripper_motor_to_joint_position(
     open_position: float,
     close_position: float,
 ) -> float:
+    """把夹爪单电机角度线性换算为 URDF 中两个手指关节的开合距离。"""
     span = open_position - close_position
     ratio = 0.0 if span == 0.0 else (position - close_position) / span
     return max(0.0, min(_GRIPPER_MAX_WIDTH * 0.5, ratio * _GRIPPER_MAX_WIDTH * 0.5))
@@ -19,6 +20,7 @@ def _gripper_motor_to_joint_position(
 
 class JointStatePublisher:
     def __init__(self, node, hardware, namespace: str, rate_hz: float) -> None:
+        """创建真机关节、单电机、夹爪及整机状态发布器和定时器。"""
         self._node = node
         self._hardware = hardware
         self._publisher = node.create_publisher(
@@ -64,6 +66,7 @@ class JointStatePublisher:
         self.publish_status()
 
     def publish(self) -> None:
+        """读取电机反馈并发布 JointState 与各关节/夹爪的详细状态。"""
         try:
             pos, vel, effort = self._hardware.get_joint_state()
         except Exception as exc:
@@ -120,6 +123,7 @@ class JointStatePublisher:
         self._publisher.publish(msg)
 
     def publish_status(self, *, read_hardware: bool = True) -> None:
+        """发布驱动模式、使能标志、状态机和各关节硬件状态码。"""
         msg = ArmStatus()
         msg.header.stamp = self._node.get_clock().now().to_msg()
         msg.mode = self._hardware.mode
