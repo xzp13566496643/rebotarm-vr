@@ -1,0 +1,9 @@
+{
+    "python.analysis.extraPaths": [
+        "/home/xuzhanpeng/ws/arm_controll/driver/reBotArm_control_py"
+    ],
+    "python.autoComplete.extraPaths": [
+        "/home/xuzhanpeng/ws/arm_controll/driver/reBotArm_control_py"
+    ],
+    "cmake.sourceDirectory": "/home/xuzhanpeng/ws/arm_controll/driver/src/rebotarm_interfaces"
+}
