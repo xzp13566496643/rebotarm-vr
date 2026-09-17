@@ -419,7 +419,13 @@ class HardwareManager:
                 len(self.joint_names), float(velocity_limit), dtype=np.float64
             )
 
-        self._begin_lowlevel_streaming("pos_vel")
+        # 只在 Servo 第一次接管，或机械臂当前不是 POS_VEL 时执行控制权交接。
+        # 后续约 50 Hz 的 Servo 帧直接下发目标，避免反复停止已经停止的 SDK 控制循环。
+        if (
+            self.state_machine != "LOWLEVEL_STREAMING"
+            or self.mode != "pos_vel"
+        ):
+            self._begin_lowlevel_streaming("pos_vel")
         # Feedback is only required by the optional per-command step guard.
         # Reading all motors here on every Servo callback adds a CAN round trip
         # before every command and makes real-hardware teleoperation laggy.
@@ -742,7 +748,8 @@ class HardwareManager:
         # 只有模式确实不同时才写参数并执行ensure_mode，避免每次开合重复配置。
         if required_mode != self._gripper_group.mode:
             self._enter_mode(self._gripper_group, required_mode, "gripper")
-        self.set_state_machine("LOWLEVEL_STREAMING")
+        if self.state_machine != "LOWLEVEL_STREAMING":
+            self.set_state_machine("LOWLEVEL_STREAMING")
 
     @staticmethod
     def _enter_mode(group, required_mode: str, label: str, **mit_gains) -> None:

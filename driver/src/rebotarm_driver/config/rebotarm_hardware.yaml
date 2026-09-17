@@ -22,7 +22,8 @@ models:
           joints: [gripper]
       gripper:
         position_limits:
-          open: -5.0
+          # 实测打开侧机械硬限位约为 -4.72 rad，保留安全余量。
+          open: -4.6
           close: 0.0
         mit_kp: 1.0
         mit_kd: 1.0

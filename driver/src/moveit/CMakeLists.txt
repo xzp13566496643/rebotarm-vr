@@ -9,4 +9,9 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(
+  PROGRAMS scripts/sim_gripper_bridge.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

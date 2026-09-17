@@ -21,7 +21,16 @@ def generate_launch_description():
     input_timeout = LaunchConfiguration("input_timeout")
     gripper_open_position = LaunchConfiguration("gripper_open_position")
     gripper_closed_position = LaunchConfiguration("gripper_closed_position")
-    gripper_velocity_limit = LaunchConfiguration("gripper_velocity_limit")
+    gripper_torque_max = LaunchConfiguration("gripper_torque_max")
+    gripper_close_torque = LaunchConfiguration("gripper_close_torque")
+    gripper_hold_torque = LaunchConfiguration("gripper_hold_torque")
+    gripper_move_kp = LaunchConfiguration("gripper_move_kp")
+    gripper_move_kd = LaunchConfiguration("gripper_move_kd")
+    gripper_close_kp = LaunchConfiguration("gripper_close_kp")
+    gripper_close_kd = LaunchConfiguration("gripper_close_kd")
+    gripper_contact_torque_threshold = LaunchConfiguration(
+        "gripper_contact_torque_threshold"
+    )
 
     # 直接加载Servo真正需要的模型参数，避免依赖完整路径规划配置。
     package_share = get_package_share_directory("rebotarm_moveit")
@@ -76,7 +85,7 @@ def generate_launch_description():
         ],
     )
 
-    # 接收PICO话题，生成累计TCP目标和Twist；夹爪只发布基础POS_VEL命令。
+    # 接收PICO话题，生成累计TCP目标和Twist；夹爪发布MIT恒力开合命令。
     vr_control_node = Node(
         package="openarmx_teleop_bridge_vr",
         executable="vr2control_node",
@@ -104,8 +113,29 @@ def generate_launch_description():
             "gripper_closed_position": ParameterValue(
                 gripper_closed_position, value_type=float
             ),
-            "gripper_velocity_limit": ParameterValue(
-                gripper_velocity_limit, value_type=float
+            "gripper_torque_max": ParameterValue(
+                gripper_torque_max, value_type=float
+            ),
+            "gripper_close_torque": ParameterValue(
+                gripper_close_torque, value_type=float
+            ),
+            "gripper_hold_torque": ParameterValue(
+                gripper_hold_torque, value_type=float
+            ),
+            "gripper_move_kp": ParameterValue(
+                gripper_move_kp, value_type=float
+            ),
+            "gripper_move_kd": ParameterValue(
+                gripper_move_kd, value_type=float
+            ),
+            "gripper_close_kp": ParameterValue(
+                gripper_close_kp, value_type=float
+            ),
+            "gripper_close_kd": ParameterValue(
+                gripper_close_kd, value_type=float
+            ),
+            "gripper_contact_torque_threshold": ParameterValue(
+                gripper_contact_torque_threshold, value_type=float
             ),
         }],
     )
@@ -120,8 +150,18 @@ def generate_launch_description():
         DeclareLaunchArgument("input_timeout", default_value="0.2"),
         # -4.60 rad用于避开实测约-4.72 rad的打开侧机械硬限位。
         DeclareLaunchArgument("gripper_open_position", default_value="-4.60"),
-        DeclareLaunchArgument("gripper_closed_position", default_value="0.0"),
-        DeclareLaunchArgument("gripper_velocity_limit", default_value="2.0"),
+        DeclareLaunchArgument("gripper_closed_position", default_value="-0.10"),
+        # Seeed官方GraspDriver参数：1.0 Nm接近，0.30 Nm接触后保持。
+        DeclareLaunchArgument("gripper_torque_max", default_value="1.5"),
+        DeclareLaunchArgument("gripper_close_torque", default_value="1.0"),
+        DeclareLaunchArgument("gripper_hold_torque", default_value="0.30"),
+        DeclareLaunchArgument("gripper_move_kp", default_value="5.0"),
+        DeclareLaunchArgument("gripper_move_kd", default_value="1.0"),
+        DeclareLaunchArgument("gripper_close_kp", default_value="0.0"),
+        DeclareLaunchArgument("gripper_close_kd", default_value="0.5"),
+        DeclareLaunchArgument(
+            "gripper_contact_torque_threshold", default_value="0.45"
+        ),
         servo_node,
         vr_control_node,
     ])

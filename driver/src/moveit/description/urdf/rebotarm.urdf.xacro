@@ -1,9 +1,30 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="reBot_B601_DM_with_gripper">
-  <!-- 真机由rebotarm_driver直接控制，不加载ros2_control虚拟硬件。 -->
-  <xacro:include filename="$(find rebotarm_moveit)/description/urdf/reBot_B601_DM_with_gripper.urdf"/>
+<robot
+    xmlns:xacro="http://www.ros.org/wiki/xacro"
+    name="reBot_B601_DM_with_gripper">
+
+  <xacro:arg name="use_fake_hardware" default="false"/>
+  <xacro:arg
+      name="initial_positions_file"
+      default="$(find rebotarm_moveit)/config/initial_positions.yaml"/>
+
+  <!-- 机械臂本体 -->
+  <xacro:include
+      filename="$(find rebotarm_moveit)/description/urdf/reBot_B601_DM_with_gripper.urdf"/>
+
+  <!-- ros2_control定义 -->
+  <xacro:include
+      filename="$(find rebotarm_moveit)/config/rebotarm.ros2_control.xacro"/>
+
+  <!-- 只在仿真时生成ros2_control假硬件 -->
+  <xacro:if value="$(arg use_fake_hardware)">
+    <xacro:rebotarm_ros2_control
+        name="rebotarm_sim"
+        initial_positions_file="$(arg initial_positions_file)"/>
+  </xacro:if>
 
   <link name="gripper_tcp"/>
+
   <joint name="gripper_tcp_joint" type="fixed">
     <origin xyz="-0.0443 0 0" rpy="0 0 0"/>
     <parent link="gripper_link"/>

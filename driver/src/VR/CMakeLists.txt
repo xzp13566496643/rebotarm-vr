@@ -31,7 +31,17 @@ find_package(rebotarm_interfaces REQUIRED)
 add_executable(openarmx_teleop_bridge_vr_node src/openarmx_teleop_bridge_vr_node.cpp)
 ament_target_dependencies(openarmx_teleop_bridge_vr_node rclcpp geometry_msgs std_msgs tf2_ros tf2_geometry_msgs)
 
-add_executable(vr2control_node src/vr2conroll.cpp)
+add_executable(
+  vr2control_node
+  src/vr2control.cpp
+  src/arm_controller.cpp
+  src/grasp_controller.cpp
+)
+target_include_directories(
+  vr2control_node
+  PRIVATE
+  include
+)
 ament_target_dependencies(
   vr2control_node
   rclcpp
@@ -45,6 +55,11 @@ ament_target_dependencies(
 
 install(TARGETS openarmx_teleop_bridge_vr_node vr2control_node
   DESTINATION lib/${PROJECT_NAME})
+
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
