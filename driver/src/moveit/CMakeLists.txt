@@ -10,7 +10,9 @@ install(
 )
 
 install(
-  PROGRAMS scripts/sim_gripper_bridge.py
+  PROGRAMS
+    scripts/sim_gripper_bridge.py
+    scripts/table_collision_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

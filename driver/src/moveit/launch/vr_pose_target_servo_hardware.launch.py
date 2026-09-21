@@ -19,6 +19,7 @@ def generate_launch_description():
     max_linear_speed = LaunchConfiguration("max_linear_speed")
     max_angular_speed = LaunchConfiguration("max_angular_speed")
     input_timeout = LaunchConfiguration("input_timeout")
+    butterworth_filter_coeff = LaunchConfiguration("butterworth_filter_coeff")
     gripper_open_position = LaunchConfiguration("gripper_open_position")
     gripper_closed_position = LaunchConfiguration("gripper_closed_position")
     gripper_torque_max = LaunchConfiguration("gripper_torque_max")
@@ -31,6 +32,12 @@ def generate_launch_description():
     gripper_contact_torque_threshold = LaunchConfiguration(
         "gripper_contact_torque_threshold"
     )
+    gripper_stall_velocity = LaunchConfiguration("gripper_stall_velocity")
+    gripper_startup_distance = LaunchConfiguration("gripper_startup_distance")
+    table_surface_z = LaunchConfiguration("table_surface_z")
+    table_size = LaunchConfiguration("table_size")
+    table_base_cutout_size = LaunchConfiguration("table_base_cutout_size")
+    table_thickness = LaunchConfiguration("table_thickness")
 
     # 直接加载Servo真正需要的模型参数，避免依赖完整路径规划配置。
     package_share = get_package_share_directory("rebotarm_moveit")
@@ -82,7 +89,32 @@ def generate_launch_description():
             robot_description_semantic,
             robot_description_kinematics,
             robot_description_planning,
+            {
+                "butterworth_filter_coeff": ParameterValue(
+                    butterworth_filter_coeff, value_type=float
+                )
+            },
         ],
+    )
+
+    # 向MoveIt PlanningScene发布桌面，使Servo的碰撞检测阻止机械臂越过z=0。
+    table_collision_node = Node(
+        package="rebotarm_moveit",
+        executable="table_collision_publisher.py",
+        name="table_collision_publisher",
+        output="screen",
+        parameters=[{
+            "table_surface_z": ParameterValue(
+                table_surface_z, value_type=float
+            ),
+            "table_size": ParameterValue(table_size, value_type=float),
+            "table_base_cutout_size": ParameterValue(
+                table_base_cutout_size, value_type=float
+            ),
+            "table_thickness": ParameterValue(
+                table_thickness, value_type=float
+            ),
+        }],
     )
 
     # 接收PICO话题，生成累计TCP目标和Twist；夹爪发布MIT恒力开合命令。
@@ -137,31 +169,46 @@ def generate_launch_description():
             "gripper_contact_torque_threshold": ParameterValue(
                 gripper_contact_torque_threshold, value_type=float
             ),
+            "gripper_stall_velocity": ParameterValue(
+                gripper_stall_velocity, value_type=float
+            ),
+            "gripper_startup_distance": ParameterValue(
+                gripper_startup_distance, value_type=float
+            ),
         }],
     )
 
     return LaunchDescription([
-        DeclareLaunchArgument("position_scale", default_value="0.8"),
+        DeclareLaunchArgument("position_scale", default_value="1.0"),
         DeclareLaunchArgument("orientation_scale", default_value="1.0"),
-        DeclareLaunchArgument("position_gain", default_value="3.0"),
-        DeclareLaunchArgument("orientation_gain", default_value="3.0"),
-        DeclareLaunchArgument("max_linear_speed", default_value="0.4"),
-        DeclareLaunchArgument("max_angular_speed", default_value="0.8"),
+        DeclareLaunchArgument("position_gain", default_value="15.0"),
+        DeclareLaunchArgument("orientation_gain", default_value="15.0"),
+        DeclareLaunchArgument("max_linear_speed", default_value="5.0"),
+        DeclareLaunchArgument("max_angular_speed", default_value="5.0"),
         DeclareLaunchArgument("input_timeout", default_value="0.2"),
+        # 数值越大，Servo关节位置输出越平滑，但相位滞后也越明显。
+        DeclareLaunchArgument("butterworth_filter_coeff", default_value="3.0"),
         # -4.60 rad用于避开实测约-4.72 rad的打开侧机械硬限位。
         DeclareLaunchArgument("gripper_open_position", default_value="-4.60"),
-        DeclareLaunchArgument("gripper_closed_position", default_value="-0.10"),
-        # Seeed官方GraspDriver参数：1.0 Nm接近，0.30 Nm接触后保持。
+        DeclareLaunchArgument("gripper_closed_position", default_value="0.0"),
+        # 同学实测参数：1.50 Nm闭合，检测接触后以0.50 Nm保持。
         DeclareLaunchArgument("gripper_torque_max", default_value="1.5"),
-        DeclareLaunchArgument("gripper_close_torque", default_value="1.0"),
-        DeclareLaunchArgument("gripper_hold_torque", default_value="0.30"),
-        DeclareLaunchArgument("gripper_move_kp", default_value="5.0"),
+        DeclareLaunchArgument("gripper_close_torque", default_value="1.50"),
+        DeclareLaunchArgument("gripper_hold_torque", default_value="0.50"),
+        DeclareLaunchArgument("gripper_move_kp", default_value="1.0"),
         DeclareLaunchArgument("gripper_move_kd", default_value="1.0"),
         DeclareLaunchArgument("gripper_close_kp", default_value="0.0"),
         DeclareLaunchArgument("gripper_close_kd", default_value="0.5"),
         DeclareLaunchArgument(
-            "gripper_contact_torque_threshold", default_value="0.45"
+            "gripper_contact_torque_threshold", default_value="0.80"
         ),
+        DeclareLaunchArgument("gripper_stall_velocity", default_value="0.015"),
+        DeclareLaunchArgument("gripper_startup_distance", default_value="0.60"),
+        DeclareLaunchArgument("table_surface_z", default_value="0.0"),
+        DeclareLaunchArgument("table_size", default_value="4.0"),
+        DeclareLaunchArgument("table_base_cutout_size", default_value="0.40"),
+        DeclareLaunchArgument("table_thickness", default_value="0.04"),
         servo_node,
+        table_collision_node,
         vr_control_node,
     ])
