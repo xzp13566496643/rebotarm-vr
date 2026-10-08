@@ -179,12 +179,12 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        DeclareLaunchArgument("position_scale", default_value="1.0"),
+        DeclareLaunchArgument("position_scale", default_value="1.2"),
         DeclareLaunchArgument("orientation_scale", default_value="1.0"),
-        DeclareLaunchArgument("position_gain", default_value="15.0"),
-        DeclareLaunchArgument("orientation_gain", default_value="15.0"),
+        DeclareLaunchArgument("position_gain", default_value="30.0"),
+        DeclareLaunchArgument("orientation_gain", default_value="50.0"),
         DeclareLaunchArgument("max_linear_speed", default_value="5.0"),
-        DeclareLaunchArgument("max_angular_speed", default_value="5.0"),
+        DeclareLaunchArgument("max_angular_speed", default_value="10.0"),
         DeclareLaunchArgument("input_timeout", default_value="0.2"),
         # 数值越大，Servo关节位置输出越平滑，但相位滞后也越明显。
         DeclareLaunchArgument("butterworth_filter_coeff", default_value="3.0"),

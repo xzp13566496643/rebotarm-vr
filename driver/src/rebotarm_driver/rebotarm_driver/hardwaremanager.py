@@ -400,12 +400,14 @@ class HardwareManager:
             velocity = np.asarray(velocities, dtype=np.float64)
             if velocity.shape != target.shape or not np.all(np.isfinite(velocity)):
                 raise ValueError("velocities must contain one finite value per arm joint")
-            lead = np.clip(
-                velocity * max(0.0, float(velocity_lookahead)),
-                -max(0.0, float(max_lookahead_step)),
-                max(0.0, float(max_lookahead_step)),
-            )
-            target = target + lead
+            # 暂时关闭 Servo 速度前瞻：直接使用 Servo 输出的关节目标位置，
+            # 避免 velocity * lookahead 额外改变目标位置而引入运动途中的晃动。
+            # lead = np.clip(
+            #     velocity * max(0.0, float(velocity_lookahead)),
+            #     -max(0.0, float(max_lookahead_step)),
+            #     max(0.0, float(max_lookahead_step)),
+            # )
+            # target = target + lead
             # The DM position-velocity mode takes a positive speed limit per motor.
             # Keep a small floor to prevent repeated stop/start behavior while
             # respecting the global real-hardware speed ceiling.
