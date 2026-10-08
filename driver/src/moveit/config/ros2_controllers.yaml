@@ -1,0 +1,47 @@
+controller_manager:
+  ros__parameters:
+    # 假硬件和控制器以100 Hz更新；MoveIt Servo仍以自己的50 Hz发布命令。
+    update_rate: 100
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    rebotarm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+# 六个机械臂关节的位置轨迹控制器。
+# 激活后接收：/rebotarm_controller/joint_trajectory
+rebotarm_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+
+
+# 两个仿真手指关节的位置轨迹控制器。
+# 激活后接收：/gripper_controller/joint_trajectory
+gripper_controller:
+  ros__parameters:
+    joints:
+      - gripper_joint1
+      - gripper_joint2
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
